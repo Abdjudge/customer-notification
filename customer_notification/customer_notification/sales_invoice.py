@@ -43,22 +43,38 @@ def get_invoice_email_defaults(customer=None, invoice=None, is_return=None):
 		"email_template": email_template,
 		"print_format": print_format,
 		"language": s.default_language or "English",
-		"cc": get_customer_cc_emails(customer) if customer else [],
+		"cc_users": get_customer_cc_users(customer) if customer else [],
 	}
 
 
-def get_customer_cc_emails(customer):
-	"""Resolve the Customer's `cc_users` table to a de-duplicated list of emails."""
+def get_customer_cc_users(customer):
+	"""Return the Customer's configured `cc_users` as a list of User ids."""
 	if not customer:
 		return []
-	users = frappe.get_all(
+	return frappe.get_all(
 		"Notification Type CC User",
 		filters={"parent": customer, "parenttype": "Customer", "parentfield": "cc_users"},
 		pluck="user",
 	)
+
+
+def get_customer_cc_emails(customer):
+	"""Resolve the Customer's `cc_users` table to a de-duplicated list of emails."""
+	return _resolve_cc_to_emails(get_customer_cc_users(customer))
+
+
+def _resolve_cc_to_emails(values):
+	"""Map CC entries (User ids and/or raw email addresses) to a clean email list.
+
+	Each value is looked up as a User: if found, its email is used; otherwise the
+	value is treated as a raw email address. Duplicates are dropped.
+	"""
 	emails = []
-	for user in users:
-		email = frappe.db.get_value("User", user, "email") or user
+	for value in values or []:
+		value = (value or "").strip()
+		if not value:
+			continue
+		email = frappe.db.get_value("User", value, "email") or value
 		if email and email not in emails:
 			emails.append(email)
 	return emails
@@ -125,10 +141,12 @@ def send_invoice(invoice, email_template=None, print_format=None, language="en",
 	if not email_template:
 		frappe.throw(_("No Sales Invoice Email Template configured in Customer Notification Settings."))
 
-	cc_emails = _normalize_cc(cc)
 	if cc is None:
 		# Background / bulk sends pass no cc: fall back to the customer's CC users.
 		cc_emails = get_customer_cc_emails(si.customer)
+	else:
+		# Dialog sends a list of User ids (and/or raw emails) — resolve to emails.
+		cc_emails = _resolve_cc_to_emails(_normalize_cc(cc))
 	cc_emails = [e for e in cc_emails if e != recipient]
 
 	lang = LANGUAGE_MAP.get(language, language or "en")

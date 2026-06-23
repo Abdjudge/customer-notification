@@ -22,7 +22,7 @@ frappe.ui.form.on("Sales Invoice", {
 });
 
 function open_send_invoice_dialog(frm, defaults) {
-	const cc = (defaults.cc || []).slice();
+	const cc = (defaults.cc_users || []).slice();
 	const d = new frappe.ui.Dialog({
 		title: __("Send Invoice {0}", [frm.doc.name]),
 		fields: [
@@ -53,13 +53,13 @@ function open_send_invoice_dialog(frm, defaults) {
 			},
 			{
 				fieldname: "cc",
-				label: __("CC"),
+				label: __("CC Users"),
 				fieldtype: "MultiSelectPills",
 				default: cc,
-				description: __("Pre-filled from the customer's CC Users. Edit as needed."),
-				get_data() {
-					// Suggest the customer's configured CC emails; free text is allowed too.
-					return cc.map((email) => ({ value: email, label: email }));
+				description: __("Pre-filled from the customer's CC Users. Search to add any other user."),
+				get_data(txt) {
+					// Link-style search against the User doctype so any user can be added.
+					return frappe.db.get_link_options("User", txt);
 				},
 			},
 		],
