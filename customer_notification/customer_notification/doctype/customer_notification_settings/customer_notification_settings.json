@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "creation": "2026-06-13 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "invoice_section",
+  "sales_invoice_email_template",
+  "sales_invoice_print_format",
+  "column_break_inv",
+  "default_language",
+  "return_section",
+  "return_invoice_email_template",
+  "return_invoice_print_format"
+ ],
+ "fields": [
+  {
+   "fieldname": "invoice_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Invoice Email"
+  },
+  {
+   "description": "Email Template used when sending a Sales Invoice to the customer.",
+   "fieldname": "sales_invoice_email_template",
+   "fieldtype": "Link",
+   "label": "Sales Invoice Email Template",
+   "options": "Email Template"
+  },
+  {
+   "description": "Print Format used to render the invoice PDF. Leave blank for the default.",
+   "fieldname": "sales_invoice_print_format",
+   "fieldtype": "Link",
+   "label": "Sales Invoice Print Format",
+   "options": "Print Format"
+  },
+  {
+   "fieldname": "column_break_inv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "English",
+   "fieldname": "default_language",
+   "fieldtype": "Select",
+   "label": "Default Language",
+   "options": "English\nArabic"
+  },
+  {
+   "fieldname": "return_section",
+   "fieldtype": "Section Break",
+   "label": "Return Invoice (Credit Note) Email"
+  },
+  {
+   "description": "Email Template used when sending a return invoice (Credit Note, is_return = 1) to the customer.",
+   "fieldname": "return_invoice_email_template",
+   "fieldtype": "Link",
+   "label": "Return Invoice Email Template",
+   "options": "Email Template"
+  },
+  {
+   "description": "Print Format used to render the return invoice PDF. Leave blank for the default.",
+   "fieldname": "return_invoice_print_format",
+   "fieldtype": "Link",
+   "label": "Return Invoice Print Format",
+   "options": "Print Format"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-13 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Customer Notification",
+ "name": "Customer Notification Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

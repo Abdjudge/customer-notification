@@ -1,0 +1,62 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ _("My Invoices") }}{% endblock %}
+
+{% block page_content %}
+<div class="my-invoices">
+	<h1 class="mb-4">{{ _("My Invoices") }}</h1>
+
+	{% if not has_customer %}
+		<div class="alert alert-info">
+			{{ _("Your account is not linked to any customer yet. Please contact us.") }}
+		</div>
+	{% elif not invoices %}
+		<div class="alert alert-info">{{ _("No invoices found.") }}</div>
+	{% else %}
+		<p class="text-muted">
+			{{ _("Total Invoices") }}: <b>{{ invoices | length }}</b>
+			&nbsp;&middot;&nbsp;
+			{{ _("Unpaid") }}: <b>{{ unpaid_count }}</b>
+		</p>
+
+		<div class="table-responsive">
+			<table class="table table-bordered table-hover">
+				<thead>
+					<tr>
+						<th>{{ _("Invoice") }}</th>
+						<th>{{ _("Date") }}</th>
+						<th>{{ _("Due Date") }}</th>
+						<th class="text-right">{{ _("Total") }}</th>
+						<th class="text-right">{{ _("Outstanding") }}</th>
+						<th>{{ _("Status") }}</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for inv in invoices %}
+					<tr>
+						<td>{{ inv.name }}</td>
+						<td>{{ inv.posting_date_fmt }}</td>
+						<td>{{ inv.due_date_fmt }}</td>
+						<td class="text-right">{{ inv.grand_total_fmt }}</td>
+						<td class="text-right">{{ inv.outstanding_fmt }}</td>
+						<td>
+							<span class="indicator-pill {{ 'green' if inv.is_paid else 'orange' }}">
+								{{ _(inv.status) }}
+							</span>
+						</td>
+						<td>
+							<a class="btn btn-xs btn-default"
+								href="/api/method/customer_notification.customer_notification.sales_invoice.download_my_invoice?invoice={{ inv.name | urlencode }}"
+								target="_blank" rel="noopener">
+								{{ _("PDF") }}
+							</a>
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+	{% endif %}
+</div>
+{% endblock %}

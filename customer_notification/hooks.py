@@ -43,7 +43,21 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+	"Customer": "public/js/customer.js",
+	"Sales Invoice": "public/js/sales_invoice.js",
+}
+doctype_list_js = {"Sales Invoice": "public/js/sales_invoice_list.js"}
+
+# Customer portal
+standard_portal_menu_items = [
+	{
+		"title": "My Invoices",
+		"route": "/my-invoices",
+		"reference_doctype": "Sales Invoice",
+		"role": "Customer",
+	},
+]
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -83,7 +97,8 @@ app_license = "mit"
 # ------------
 
 # before_install = "customer_notification.install.before_install"
-# after_install = "customer_notification.install.after_install"
+after_install = "customer_notification.customer_notification.custom_fields.create"
+after_migrate = "customer_notification.customer_notification.custom_fields.after_migrate"
 
 # Uninstallation
 # ------------
@@ -148,23 +163,11 @@ app_license = "mit"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"customer_notification.tasks.all"
-# 	],
-# 	"daily": [
-# 		"customer_notification.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"customer_notification.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"customer_notification.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"customer_notification.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"hourly": [
+		"customer_notification.customer_notification.tasks.send_scheduled_notifications"
+	],
+}
 
 # Testing
 # -------
