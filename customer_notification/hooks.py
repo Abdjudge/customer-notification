@@ -152,20 +152,46 @@ after_migrate = "customer_notification.customer_notification.custom_fields.after
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Customer": {
+		"after_insert": "customer_notification.customer_notification.webhook.on_customer_insert",
+		"on_update": "customer_notification.customer_notification.webhook.on_customer_update",
+	},
+	"Contact": {
+		"after_insert": "customer_notification.customer_notification.webhook.on_contact_change",
+		"on_update": "customer_notification.customer_notification.webhook.on_contact_change",
+	},
+	"Sales Order": {
+		"after_insert": "customer_notification.customer_notification.webhook.on_sales_order_insert",
+		"on_submit": "customer_notification.customer_notification.webhook.on_sales_order_submit",
+		"on_cancel": "customer_notification.customer_notification.webhook.on_sales_order_cancel",
+	},
+	"Sales Invoice": {
+		"after_insert": "customer_notification.customer_notification.webhook.on_invoice_insert",
+		"on_update": "customer_notification.customer_notification.webhook.on_invoice_update",
+		"on_submit": "customer_notification.customer_notification.webhook.on_invoice_submit",
+		"on_cancel": "customer_notification.customer_notification.webhook.on_invoice_cancel",
+	},
+	"Payment Entry": {
+		"on_submit": "customer_notification.customer_notification.webhook.on_payment_submit",
+		"on_cancel": "customer_notification.customer_notification.webhook.on_payment_cancel",
+	},
+	"Item": {
+		"after_insert": "customer_notification.customer_notification.webhook.on_item_change",
+		"on_update": "customer_notification.customer_notification.webhook.on_item_change",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
 
 scheduler_events = {
 	"hourly": [
-		"customer_notification.customer_notification.tasks.send_scheduled_notifications"
+		"customer_notification.customer_notification.tasks.send_scheduled_notifications",
+		"customer_notification.customer_notification.tasks.retry_failed_webhooks",
+	],
+	"daily": [
+		"customer_notification.customer_notification.tasks.push_aging_snapshot",
 	],
 }
 

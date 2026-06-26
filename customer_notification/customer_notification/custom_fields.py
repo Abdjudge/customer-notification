@@ -29,6 +29,55 @@ CUSTOM_FIELDS = {
 				"from the Send to Customer dialog."
 			),
 		},
+		# --- Collection App fields ---
+		{
+			"fieldname": "cn_collection_section",
+			"label": "Collection App",
+			"fieldtype": "Section Break",
+			"insert_after": "cc_users",
+			"collapsible": 1,
+		},
+		{
+			"fieldname": "account_type",
+			"label": "Account Type",
+			"fieldtype": "Select",
+			"options": "\nGlobal\nAfaqy\nOther",
+			"insert_after": "cn_collection_section",
+			"description": "Customer classification used by the Collection App (Global, Afaqy, Other).",
+		},
+		{
+			"fieldname": "kam_code",
+			"label": "KAM Code",
+			"fieldtype": "Data",
+			"insert_after": "account_type",
+			"description": "Key Account Manager employee code.",
+		},
+		{
+			"fieldname": "kam_name",
+			"label": "KAM Name",
+			"fieldtype": "Data",
+			"insert_after": "kam_code",
+			"description": "Key Account Manager display name.",
+		},
+		{
+			"fieldname": "service_activation_date",
+			"label": "Service Activation Date",
+			"fieldtype": "Date",
+			"insert_after": "kam_name",
+			"description": "Date the customer's service went live — used to trigger the Welcome Call.",
+		},
+	],
+	"Sales Order": [
+		{
+			"fieldname": "is_addon",
+			"label": "Is Add-On",
+			"fieldtype": "Check",
+			"insert_after": "order_type",
+			"description": (
+				"Tick if this Sales Order represents an add-on service for an existing customer. "
+				"The Collection App uses this to trigger the Existing Customer Add-on Confirmation workflow."
+			),
+		},
 	],
 }
 

@@ -55,3 +55,71 @@ def send_scheduled_notifications():
 				title="Customer Notification: scheduler failed",
 				message=f"{name}\n{frappe.get_traceback()}",
 			)
+
+
+def push_aging_snapshot():
+	"""Daily job: compute aging buckets and push an aging.snapshot webhook to the Collection App."""
+	from customer_notification.customer_notification.api import _compute_aging
+	from customer_notification.customer_notification.webhook import fire, _get_settings
+
+	try:
+		settings = _get_settings()
+		if not settings.enabled or not settings.get("collection_app_webhook_url"):
+			return
+
+		data = _compute_aging()
+		fire(
+			"aging.snapshot",
+			{
+				"snapshotDate": today(),
+				"totalCustomers": len(data),
+				"data": data,
+			},
+			"Aging Report",
+			today(),
+			metadata={"triggeredBy": "Scheduler"},
+		)
+	except Exception:
+		frappe.log_error(
+			title="Collection App: aging snapshot push failed",
+			message=frappe.get_traceback(),
+		)
+
+
+def retry_failed_webhooks():
+	"""Hourly job: retry Failed ERP Webhook Log entries (up to 3 attempts, within 24 h)."""
+	from customer_notification.customer_notification.webhook import _get_settings, _retry_delivery
+
+	try:
+		settings = _get_settings()
+		if not settings.enabled or not settings.get("collection_app_webhook_url"):
+			return
+	except Exception:
+		return
+
+	cutoff = frappe.utils.add_to_date(now_datetime(), hours=-24)
+	failed = frappe.get_all(
+		"ERP Webhook Log",
+		filters={
+			"status": "Failed",
+			"attempts": ("<", 3),
+			"sent_on": (">=", cutoff),
+		},
+		fields=["name"],
+		order_by="sent_on asc",
+		limit=30,
+	)
+
+	for row in failed:
+		try:
+			frappe.enqueue(
+				"customer_notification.customer_notification.webhook._retry_delivery",
+				queue="default",
+				log_name=row.name,
+				timeout=60,
+			)
+		except Exception:
+			frappe.log_error(
+				title="Collection App: retry enqueue failed",
+				message=f"Log: {row.name}\n{frappe.get_traceback()}",
+			)

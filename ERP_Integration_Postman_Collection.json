@@ -1,0 +1,836 @@
+{
+  "info": {
+    "name": "ERP Integration – Collection App",
+    "_postman_id": "erp-collection-app-integration-v1",
+    "description": "Full API coverage for the ERPNext → Collection App integration built on the customer-notification Frappe app.\n\nFolders:\n  1. Authentication – login + session check\n  2. Pull APIs – full-sync GET endpoints (customers, contacts, invoices, payments, sales orders, items)\n  3. Reporting & Analytics – aging snapshot, reconciliation, PDF URL\n  4. Outbound Webhook Events – POST examples showing every event ERPNext fires to the Collection App\n\nBase URL variable: {{base_url}} = https://globalit.frappe.cloud\nSet collection_app_url + collection_app_token for the webhook event requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://globalit.frappe.cloud",
+      "type": "string",
+      "description": "ERPNext site base URL"
+    },
+    {
+      "key": "usr",
+      "value": "a@b.integration.com",
+      "type": "string",
+      "description": "ERPNext login username"
+    },
+    {
+      "key": "pwd",
+      "value": "123@erp",
+      "type": "string",
+      "description": "ERPNext login password"
+    },
+    {
+      "key": "collection_app_url",
+      "value": "https://collection.example.com",
+      "type": "string",
+      "description": "Base URL of the Collection App (target of outbound webhooks)"
+    },
+    {
+      "key": "collection_app_token",
+      "value": "REPLACE_WITH_BEARER_TOKEN",
+      "type": "string",
+      "description": "Bearer token sent as Authorization header to the Collection App"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 – Authentication",
+      "description": "Log in to ERPNext and verify the session. Postman stores the session cookie automatically after a successful login.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Logged In', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.eql('Logged In');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usr\": \"{{usr}}\",\n  \"pwd\": \"{{pwd}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/method/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "login"]
+            },
+            "description": "Session-based login. The response sets a cookie that Postman carries on all subsequent requests."
+          }
+        },
+        {
+          "name": "Get Logged User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Message is a valid email', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('@');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/frappe.auth.get_logged_user",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "frappe.auth.get_logged_user"]
+            },
+            "description": "Verify the active session. Returns the logged-in user's email address."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 – Pull APIs (Full Sync)",
+      "description": "Whitelisted GET endpoints the Collection App calls to perform a full baseline sync or incremental pull.\n\nAll endpoints:\n  • require an active ERPNext session (or API Key header)\n  • support pagination via page / page_size (max 500)\n  • support modified_after for incremental sync\n  • return { page, page_size, total, total_pages, data[] }",
+      "item": [
+        {
+          "name": "Get Customers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has data array', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message.data).to.be.an('array');",
+                  "});",
+                  "pm.test('First customer has required fields', function () {",
+                  "  const data = pm.response.json().message.data;",
+                  "  if (data.length > 0) {",
+                  "    pm.expect(data[0]).to.have.all.keys('customerCode','customerName','status');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_customers?page=1&page_size=200",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_customers"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number (starts at 1)" },
+                { "key": "page_size", "value": "200", "description": "Records per page (max 500)" },
+                { "key": "modified_after", "value": "", "description": "ISO datetime – return only records modified after this date (incremental sync)", "disabled": true }
+              ]
+            },
+            "description": "Returns paginated customers with all Collection App fields:\ncustomerCode, customerName, status, accountType, kamCode, kamName, billingEmail, phone, customerGroup, territory, createdAt, serviceActivationDate"
+          }
+        },
+        {
+          "name": "Get Contacts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has data array', function () {",
+                  "  pm.expect(pm.response.json().message.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_contacts?page=1&page_size=200",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_contacts"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "200" },
+                { "key": "modified_after", "value": "", "description": "ISO datetime for incremental pull", "disabled": true }
+              ]
+            },
+            "description": "Returns contacts linked to any Customer, with customerCode resolved from the Dynamic Link table.\nFields: name, first_name, last_name, full_name, email_id, mobile_no, phone, customerCode"
+          }
+        },
+        {
+          "name": "Get Invoices (all open)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Invoices have lineItems', function () {",
+                  "  const data = pm.response.json().message.data;",
+                  "  if (data.length > 0) {",
+                  "    pm.expect(data[0]).to.have.property('lineItems');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_invoices?page=1&page_size=100&status=Unpaid",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_invoices"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "100" },
+                { "key": "status", "value": "Unpaid", "description": "Filter by ERPNext invoice status (Unpaid, Paid, Overdue, etc.). Remove to get all." },
+                { "key": "from_date", "value": "", "description": "Start posting date (YYYY-MM-DD)", "disabled": true },
+                { "key": "to_date", "value": "", "description": "End posting date (YYYY-MM-DD)", "disabled": true },
+                { "key": "modified_after", "value": "", "description": "ISO datetime for incremental pull", "disabled": true }
+              ]
+            },
+            "description": "Returns submitted Sales Invoices.\nIncludes lineItems (product segmentation) and salesOrderNo.\nCredit notes (is_return=1) are also returned with isCreditNote: true."
+          }
+        },
+        {
+          "name": "Get Invoices (date range)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_invoices?page=1&page_size=200&from_date=2025-01-01&to_date=2025-12-31",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_invoices"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "200" },
+                { "key": "from_date", "value": "2025-01-01" },
+                { "key": "to_date", "value": "2025-12-31" }
+              ]
+            },
+            "description": "Pull all invoices posted in 2025 (adjust dates as needed for historical range)."
+          }
+        },
+        {
+          "name": "Get Payments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Payments have allocatedInvoices', function () {",
+                  "  const data = pm.response.json().message.data;",
+                  "  if (data.length > 0) {",
+                  "    pm.expect(data[0]).to.have.property('allocatedInvoices');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_payments?page=1&page_size=200",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_payments"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "200" },
+                { "key": "from_date", "value": "", "description": "Start posting date", "disabled": true },
+                { "key": "to_date", "value": "", "description": "End posting date", "disabled": true },
+                { "key": "modified_after", "value": "", "description": "ISO datetime for incremental pull", "disabled": true }
+              ]
+            },
+            "description": "Returns submitted Payment Entries for Customer party type.\nEach payment includes allocatedInvoices[] with invoiceNo and allocatedAmount."
+          }
+        },
+        {
+          "name": "Get Sales Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_sales_orders?page=1&page_size=200",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_sales_orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "200" },
+                { "key": "status", "value": "", "description": "Draft, To Deliver and Bill, Completed, Cancelled", "disabled": true },
+                { "key": "from_date", "value": "", "disabled": true },
+                { "key": "to_date", "value": "", "disabled": true },
+                { "key": "modified_after", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Returns both Draft (docstatus=0) and Submitted (docstatus=1) Sales Orders.\nIncludes isAddon flag (custom field) and items[]."
+          }
+        },
+        {
+          "name": "Get Items (Product Catalogue)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_items?page=1&page_size=500",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_items"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "500" },
+                { "key": "modified_after", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Returns the full item catalogue for product segmentation mapping.\nFields: itemCode, itemName, itemGroup, uom, disabled."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 – Reporting & Analytics",
+      "description": "Aging snapshots, reconciliation totals, and invoice PDF URL generation.",
+      "item": [
+        {
+          "name": "Get Aging Snapshot (all customers)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has snapshotDate and data', function () {",
+                  "  const msg = pm.response.json().message;",
+                  "  pm.expect(msg).to.have.property('snapshotDate');",
+                  "  pm.expect(msg.data).to.be.an('array');",
+                  "});",
+                  "pm.test('Aging buckets present on first record', function () {",
+                  "  const data = pm.response.json().message.data;",
+                  "  if (data.length > 0) {",
+                  "    pm.expect(data[0]).to.have.property('aging0_30');",
+                  "    pm.expect(data[0]).to.have.property('aging501Above');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_aging_snapshot",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_aging_snapshot"],
+              "query": [
+                { "key": "as_of_date", "value": "", "description": "YYYY-MM-DD — defaults to today", "disabled": true },
+                { "key": "company", "value": "", "description": "Filter by ERPNext company name", "disabled": true },
+                { "key": "customer", "value": "", "description": "Filter to a single customer code", "disabled": true }
+              ]
+            },
+            "description": "Computes aging from outstanding submitted Sales Invoices.\n\nReturns buckets matching the document spec:\n  aging0_30, aging31_60, aging61_90, aging91_120,\n  aging121_200, aging201_300, aging301_400, aging401_500, aging501Above\n\nUse as_of_date for historical snapshots."
+          }
+        },
+        {
+          "name": "Get Aging Snapshot (single customer)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_aging_snapshot?customer=CUST-0001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_aging_snapshot"],
+              "query": [
+                { "key": "customer", "value": "CUST-0001", "description": "Replace with actual customer code" }
+              ]
+            },
+            "description": "Aging for a single customer — useful during reconciliation."
+          }
+        },
+        {
+          "name": "Get Reconciliation Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has invoice and payment totals', function () {",
+                  "  const msg = pm.response.json().message;",
+                  "  pm.expect(msg).to.have.property('invoices');",
+                  "  pm.expect(msg).to.have.property('payments');",
+                  "  pm.expect(msg.invoices).to.have.property('count');",
+                  "  pm.expect(msg.invoices).to.have.property('total');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_reconciliation_summary?from_date=2025-01-01&to_date=2025-12-31",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_reconciliation_summary"],
+              "query": [
+                { "key": "from_date", "value": "2025-01-01", "description": "Start of reconciliation period (YYYY-MM-DD)" },
+                { "key": "to_date", "value": "2025-12-31", "description": "End of reconciliation period (YYYY-MM-DD)" },
+                { "key": "company", "value": "", "description": "Optional company filter", "disabled": true }
+              ]
+            },
+            "description": "Returns invoice count, total grand_total, total outstanding, and payment count + total for a date range.\nThe Collection App compares these numbers against its own stored totals to detect gaps."
+          }
+        },
+        {
+          "name": "Get Invoice PDF URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Has pdfUrl', function () {",
+                  "  const msg = pm.response.json().message;",
+                  "  pm.expect(msg).to.have.property('pdfUrl');",
+                  "  pm.expect(msg.pdfUrl).to.include('get_pdf');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/method/customer_notification.customer_notification.api.get_invoice_pdf_url?invoice=SINV-00001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "method", "customer_notification.customer_notification.api.get_invoice_pdf_url"],
+              "query": [
+                { "key": "invoice", "value": "SINV-00001", "description": "ERPNext Sales Invoice name (e.g. SINV-00001)" },
+                { "key": "print_format", "value": "", "description": "Override print format name. Defaults to Collection App Settings.", "disabled": true }
+              ]
+            },
+            "description": "Returns the URL to download the PDF for a given invoice.\nThe Collection App can use this URL + the same ERPNext credentials to download and store the file in MinIO."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 – Outbound Webhook Events (ERPNext → Collection App)",
+      "description": "These requests simulate what ERPNext sends to the Collection App webhook endpoint.\n\nEvery request:\n  • URL  : {{collection_app_url}}/integration/erp/webhooks\n  • Method: POST\n  • Header: Authorization: Bearer {{collection_app_token}}\n  • Body  : Standard event envelope\n\nUse these to test your Collection App receiver endpoint without needing to trigger real ERPNext events.",
+      "item": [
+        {
+          "name": "customer.created",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"eventType\": \"customer.created\",\n  \"occurredAt\": \"2026-06-26T08:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"customerCode\": \"CUST-00123\",\n    \"customerName\": \"Acme Telecommunications\",\n    \"status\": \"Active\",\n    \"accountType\": \"Global\",\n    \"kamCode\": \"EMP-0042\",\n    \"kamName\": \"Ahmad Al-Rashid\",\n    \"salesLead\": null,\n    \"billingEmail\": \"billing@acme-telecom.com\",\n    \"phone\": \"+966501234567\",\n    \"customerGroup\": \"Commercial\",\n    \"territory\": \"Riyadh\",\n    \"createdAt\": \"2026-06-26 08:00:00\",\n    \"serviceActivationDate\": null\n  },\n  \"metadata\": {\n    \"erpUser\": \"a@b.integration.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a new Customer is created in ERPNext (after_insert).\nCollection App action: create customer profile and trigger New Customer Welcome Call."
+          }
+        },
+        {
+          "name": "customer.updated",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440002\",\n  \"eventType\": \"customer.updated\",\n  \"occurredAt\": \"2026-06-26T09:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"customerCode\": \"CUST-00123\",\n    \"customerName\": \"Acme Telecommunications LLC\",\n    \"status\": \"Active\",\n    \"accountType\": \"Global\",\n    \"kamCode\": \"EMP-0042\",\n    \"kamName\": \"Ahmad Al-Rashid\",\n    \"salesLead\": null,\n    \"billingEmail\": \"ar@acme-telecom.com\",\n    \"phone\": \"+966501234567\",\n    \"customerGroup\": \"Commercial\",\n    \"territory\": \"Riyadh\",\n    \"createdAt\": \"2026-06-26 08:00:00\",\n    \"serviceActivationDate\": \"2026-06-26\"\n  },\n  \"metadata\": {\n    \"erpUser\": \"a@b.integration.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired on every Customer save (on_update). Collection App action: update customer profile and contacts."
+          }
+        },
+        {
+          "name": "contact.created",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440003\",\n  \"eventType\": \"contact.created\",\n  \"occurredAt\": \"2026-06-26T08:05:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"contactId\": \"Ahmad Al-Rashid-1\",\n    \"firstName\": \"Ahmad\",\n    \"lastName\": \"Al-Rashid\",\n    \"fullName\": \"Ahmad Al-Rashid\",\n    \"email\": \"ahmad@acme-telecom.com\",\n    \"phone\": \"+966501234567\",\n    \"mobile\": \"+966501234567\",\n    \"customerCode\": \"CUST-00123\"\n  },\n  \"metadata\": {\n    \"erpUser\": \"a@b.integration.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Contact linked to a Customer is created. Used for Welcome Call, reminders, and invoice delivery."
+          }
+        },
+        {
+          "name": "contact.updated",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440004\",\n  \"eventType\": \"contact.updated\",\n  \"occurredAt\": \"2026-06-26T10:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"contactId\": \"Ahmad Al-Rashid-1\",\n    \"firstName\": \"Ahmad\",\n    \"lastName\": \"Al-Rashid\",\n    \"fullName\": \"Ahmad Al-Rashid\",\n    \"email\": \"ahmad.new@acme-telecom.com\",\n    \"phone\": \"+966509999999\",\n    \"mobile\": \"+966509999999\",\n    \"customerCode\": \"CUST-00123\"\n  },\n  \"metadata\": {\n    \"erpUser\": \"a@b.integration.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a customer-linked Contact is updated. Keeps reminder and call details accurate."
+          }
+        },
+        {
+          "name": "sales_order.created_draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440005\",\n  \"eventType\": \"sales_order.created_draft\",\n  \"occurredAt\": \"2026-06-26T08:30:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"salesOrderNo\": \"SAL-ORD-00456\",\n    \"customerCode\": \"CUST-00123\",\n    \"status\": \"Draft\",\n    \"isAddon\": true,\n    \"orderDate\": \"2026-06-26\",\n    \"totalAmount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"company\": \"Global IT\",\n    \"createdBy\": \"sales@globalit.com\",\n    \"items\": [\n      {\n        \"itemCode\": \"SVC-DIA-500\",\n        \"itemName\": \"DIA 500 GB\",\n        \"qty\": 1,\n        \"rate\": 12000.00,\n        \"amount\": 12000.00,\n        \"uom\": \"Month\"\n      }\n    ]\n  },\n  \"metadata\": {\n    \"erpUser\": \"sales@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Draft Sales Order is first saved (after_insert).\nCollection App action: if isAddon=true and customer exists, trigger Existing Customer Add-on Confirmation workflow."
+          }
+        },
+        {
+          "name": "sales_order.submitted",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440006\",\n  \"eventType\": \"sales_order.submitted\",\n  \"occurredAt\": \"2026-06-26T09:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"salesOrderNo\": \"SAL-ORD-00456\",\n    \"customerCode\": \"CUST-00123\",\n    \"status\": \"To Deliver and Bill\",\n    \"isAddon\": true,\n    \"orderDate\": \"2026-06-26\",\n    \"totalAmount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"company\": \"Global IT\",\n    \"createdBy\": \"sales@globalit.com\",\n    \"items\": [\n      {\n        \"itemCode\": \"SVC-DIA-500\",\n        \"itemName\": \"DIA 500 GB\",\n        \"qty\": 1,\n        \"rate\": 12000.00,\n        \"amount\": 12000.00,\n        \"uom\": \"Month\"\n      }\n    ]\n  },\n  \"metadata\": {\n    \"erpUser\": \"approver@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Sales Order is submitted/approved. Collection App action: update add-on tracking status."
+          }
+        },
+        {
+          "name": "sales_order.cancelled",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440007\",\n  \"eventType\": \"sales_order.cancelled\",\n  \"occurredAt\": \"2026-06-26T11:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"salesOrderNo\": \"SAL-ORD-00456\",\n    \"customerCode\": \"CUST-00123\",\n    \"status\": \"Cancelled\",\n    \"isAddon\": true,\n    \"orderDate\": \"2026-06-26\",\n    \"totalAmount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"company\": \"Global IT\",\n    \"createdBy\": \"sales@globalit.com\",\n    \"items\": []\n  },\n  \"metadata\": {\n    \"erpUser\": \"a@b.integration.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Sales Order is cancelled. Collection App action: close or cancel related add-on confirmation task if not yet invoiced."
+          }
+        },
+        {
+          "name": "invoice.created",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440008\",\n  \"eventType\": \"invoice.created\",\n  \"occurredAt\": \"2026-06-26T10:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"invoiceNo\": \"SINV-00789\",\n    \"customerCode\": \"CUST-00123\",\n    \"invoiceDate\": \"2026-06-26\",\n    \"dueDate\": \"2026-07-26\",\n    \"status\": \"Draft\",\n    \"totalAmount\": 12000.00,\n    \"paidAmount\": 0.00,\n    \"outstandingAmount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"company\": \"Global IT\",\n    \"salesOrderNo\": \"SAL-ORD-00456\",\n    \"isCreditNote\": false,\n    \"returnAgainstInvoice\": null,\n    \"lineItems\": [\n      {\n        \"itemCode\": \"SVC-DIA-500\",\n        \"itemName\": \"DIA 500 GB\",\n        \"itemGroup\": \"Internet Services\",\n        \"qty\": 1,\n        \"rate\": 12000.00,\n        \"amount\": 12000.00,\n        \"uom\": \"Month\"\n      }\n    ]\n  },\n  \"metadata\": {\n    \"erpUser\": \"billing@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Sales Invoice is first saved as Draft (after_insert).\nCollection App action: upsert invoice, update customer outstanding, prepare reminder data."
+          }
+        },
+        {
+          "name": "invoice.submitted",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440009\",\n  \"eventType\": \"invoice.submitted\",\n  \"occurredAt\": \"2026-06-26T10:15:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"invoiceNo\": \"SINV-00789\",\n    \"customerCode\": \"CUST-00123\",\n    \"invoiceDate\": \"2026-06-26\",\n    \"dueDate\": \"2026-07-26\",\n    \"status\": \"Unpaid\",\n    \"totalAmount\": 12000.00,\n    \"paidAmount\": 0.00,\n    \"outstandingAmount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"company\": \"Global IT\",\n    \"salesOrderNo\": \"SAL-ORD-00456\",\n    \"isCreditNote\": false,\n    \"returnAgainstInvoice\": null,\n    \"lineItems\": [\n      {\n        \"itemCode\": \"SVC-DIA-500\",\n        \"itemName\": \"DIA 500 GB\",\n        \"itemGroup\": \"Internet Services\",\n        \"qty\": 1,\n        \"rate\": 12000.00,\n        \"amount\": 12000.00,\n        \"uom\": \"Month\"\n      }\n    ]\n  },\n  \"metadata\": {\n    \"erpUser\": \"billing@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Sales Invoice is submitted (on_submit). Immediately followed by invoice.pdf_ready if PDF webhook is enabled."
+          }
+        },
+        {
+          "name": "invoice.pdf_ready",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440010\",\n  \"eventType\": \"invoice.pdf_ready\",\n  \"occurredAt\": \"2026-06-26T10:15:01Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"invoiceNo\": \"SINV-00789\",\n    \"pdfUrl\": \"https://globalit.frappe.cloud/api/method/frappe.utils.pdf.get_pdf?doctype=Sales+Invoice&name=SINV-00789\",\n    \"pdfGeneratedAt\": \"2026-06-26T10:15:01Z\",\n    \"version\": 1\n  },\n  \"metadata\": {\n    \"erpUser\": \"billing@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired immediately after invoice.submitted.\nCollection App action: download pdfUrl using ERPNext credentials, store in MinIO, link to invoice record.\n\nNote: pdfUrl requires ERPNext authentication to download."
+          }
+        },
+        {
+          "name": "invoice.updated",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440011\",\n  \"eventType\": \"invoice.updated\",\n  \"occurredAt\": \"2026-06-26T12:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"invoiceNo\": \"SINV-00789\",\n    \"customerCode\": \"CUST-00123\",\n    \"invoiceDate\": \"2026-06-26\",\n    \"dueDate\": \"2026-08-10\",\n    \"status\": \"Overdue\",\n    \"totalAmount\": 12000.00,\n    \"paidAmount\": 0.00,\n    \"outstandingAmount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"company\": \"Global IT\",\n    \"salesOrderNo\": \"SAL-ORD-00456\",\n    \"isCreditNote\": false,\n    \"returnAgainstInvoice\": null,\n    \"lineItems\": []\n  },\n  \"metadata\": {\n    \"erpUser\": \"a@b.integration.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a submitted invoice changes on a watched field (outstanding_amount, due_date, status, grand_total)."
+          }
+        },
+        {
+          "name": "invoice.cancelled",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440012\",\n  \"eventType\": \"invoice.cancelled\",\n  \"occurredAt\": \"2026-06-26T14:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"invoiceNo\": \"SINV-00789\",\n    \"customerCode\": \"CUST-00123\",\n    \"invoiceDate\": \"2026-06-26\",\n    \"dueDate\": \"2026-07-26\",\n    \"status\": \"Cancelled\",\n    \"totalAmount\": 12000.00,\n    \"paidAmount\": 0.00,\n    \"outstandingAmount\": 0.00,\n    \"currency\": \"SAR\",\n    \"company\": \"Global IT\",\n    \"salesOrderNo\": \"SAL-ORD-00456\",\n    \"isCreditNote\": false,\n    \"returnAgainstInvoice\": null,\n    \"lineItems\": []\n  },\n  \"metadata\": {\n    \"erpUser\": \"a@b.integration.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when an invoice is cancelled. Collection App action: mark invoice cancelled and update customer balance."
+          }
+        },
+        {
+          "name": "credit_note.created",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440013\",\n  \"eventType\": \"credit_note.created\",\n  \"occurredAt\": \"2026-06-26T15:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"invoiceNo\": \"SINV-00790\",\n    \"customerCode\": \"CUST-00123\",\n    \"invoiceDate\": \"2026-06-26\",\n    \"dueDate\": null,\n    \"status\": \"Return\",\n    \"totalAmount\": -2000.00,\n    \"paidAmount\": 0.00,\n    \"outstandingAmount\": -2000.00,\n    \"currency\": \"SAR\",\n    \"company\": \"Global IT\",\n    \"salesOrderNo\": null,\n    \"isCreditNote\": true,\n    \"returnAgainstInvoice\": \"SINV-00789\",\n    \"lineItems\": [\n      {\n        \"itemCode\": \"SVC-DIA-500\",\n        \"itemName\": \"DIA 500 GB\",\n        \"itemGroup\": \"Internet Services\",\n        \"qty\": -1,\n        \"rate\": 2000.00,\n        \"amount\": -2000.00,\n        \"uom\": \"Month\"\n      }\n    ]\n  },\n  \"metadata\": {\n    \"erpUser\": \"billing@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Credit Note (return Sales Invoice with is_return=1) is created.\nNote: amounts are negative. returnAgainstInvoice points to the original invoice."
+          }
+        },
+        {
+          "name": "payment.submitted",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440014\",\n  \"eventType\": \"payment.submitted\",\n  \"occurredAt\": \"2026-07-05T10:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"paymentId\": \"PE-00321\",\n    \"paymentDate\": \"2026-07-05\",\n    \"customerCode\": \"CUST-00123\",\n    \"amount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"status\": \"Submitted\",\n    \"referenceNo\": \"TRF-20260705-001\",\n    \"company\": \"Global IT\",\n    \"allocatedInvoices\": [\n      {\n        \"invoiceNo\": \"SINV-00789\",\n        \"allocatedAmount\": 12000.00,\n        \"outstandingAmount\": 0.00\n      }\n    ]\n  },\n  \"metadata\": {\n    \"erpUser\": \"finance@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Payment Entry is submitted (on_submit).\nCollection App action: update paid amount, outstanding, PTP status, collection rate."
+          }
+        },
+        {
+          "name": "payment.cancelled",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440015\",\n  \"eventType\": \"payment.cancelled\",\n  \"occurredAt\": \"2026-07-06T09:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"paymentId\": \"PE-00321\",\n    \"paymentDate\": \"2026-07-05\",\n    \"customerCode\": \"CUST-00123\",\n    \"amount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"status\": \"Cancelled\",\n    \"referenceNo\": \"TRF-20260705-001\",\n    \"company\": \"Global IT\",\n    \"allocatedInvoices\": [\n      {\n        \"invoiceNo\": \"SINV-00789\",\n        \"allocatedAmount\": 12000.00,\n        \"outstandingAmount\": 12000.00\n      }\n    ]\n  },\n  \"metadata\": {\n    \"erpUser\": \"finance@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a Payment Entry is cancelled/reversed. Collection App action: reverse payment and recalculate outstanding."
+          }
+        },
+        {
+          "name": "item.created",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440016\",\n  \"eventType\": \"item.created\",\n  \"occurredAt\": \"2026-06-26T08:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"itemCode\": \"SVC-M2M-100\",\n    \"itemName\": \"M2M SIM Package 100 SIMs\",\n    \"itemGroup\": \"IoT Services\",\n    \"description\": \"Machine-to-Machine SIM package for 100 active SIMs\",\n    \"disabled\": false,\n    \"uom\": \"Month\"\n  },\n  \"metadata\": {\n    \"erpUser\": \"admin@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when a new Item/Product is created. Used by Collection App for product segmentation mapping."
+          }
+        },
+        {
+          "name": "item.updated",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440017\",\n  \"eventType\": \"item.updated\",\n  \"occurredAt\": \"2026-06-26T11:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"itemCode\": \"SVC-M2M-100\",\n    \"itemName\": \"M2M SIM Package 100 SIMs (Updated)\",\n    \"itemGroup\": \"IoT Services\",\n    \"description\": \"Updated description\",\n    \"disabled\": false,\n    \"uom\": \"Month\"\n  },\n  \"metadata\": {\n    \"erpUser\": \"admin@globalit.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Fired when an existing Item is updated. Collection App updates product grouping suggestions."
+          }
+        },
+        {
+          "name": "aging.snapshot (daily push)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440018\",\n  \"eventType\": \"aging.snapshot\",\n  \"occurredAt\": \"2026-06-26T01:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"snapshotDate\": \"2026-06-26\",\n    \"totalCustomers\": 2,\n    \"data\": [\n      {\n        \"customerCode\": \"CUST-00123\",\n        \"accountType\": \"Global\",\n        \"snapshotDate\": \"2026-06-26\",\n        \"totalOutstanding\": 24000.00,\n        \"aging0_30\": 12000.00,\n        \"aging31_60\": 12000.00,\n        \"aging61_90\": 0.00,\n        \"aging91_120\": 0.00,\n        \"aging121_200\": 0.00,\n        \"aging201_300\": 0.00,\n        \"aging301_400\": 0.00,\n        \"aging401_500\": 0.00,\n        \"aging501Above\": 0.00\n      },\n      {\n        \"customerCode\": \"CUST-00456\",\n        \"accountType\": \"Afaqy\",\n        \"snapshotDate\": \"2026-06-26\",\n        \"totalOutstanding\": 55000.00,\n        \"aging0_30\": 0.00,\n        \"aging31_60\": 5000.00,\n        \"aging61_90\": 20000.00,\n        \"aging91_120\": 30000.00,\n        \"aging121_200\": 0.00,\n        \"aging201_300\": 0.00,\n        \"aging301_400\": 0.00,\n        \"aging401_500\": 0.00,\n        \"aging501Above\": 0.00\n      }\n    ]\n  },\n  \"metadata\": {\n    \"triggeredBy\": \"Scheduler\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Pushed daily by the ERPNext scheduler (tasks.push_aging_snapshot).\nContains the full per-customer aging breakdown for all 9 buckets.\nCollection App uses this for DSO calculation and management dashboards.\n\nThis event is NOT triggered by a document save — it is a scheduled push."
+          }
+        },
+        {
+          "name": "⚠ Idempotency Test – Duplicate eventId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{collection_app_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"550e8400-e29b-41d4-a716-446655440014\",\n  \"eventType\": \"payment.submitted\",\n  \"occurredAt\": \"2026-07-05T10:00:00Z\",\n  \"sourceSystem\": \"ERPNext\",\n  \"erpCompany\": \"Global IT\",\n  \"data\": {\n    \"paymentId\": \"PE-00321\",\n    \"paymentDate\": \"2026-07-05\",\n    \"customerCode\": \"CUST-00123\",\n    \"amount\": 12000.00,\n    \"currency\": \"SAR\",\n    \"status\": \"Submitted\",\n    \"referenceNo\": \"TRF-20260705-001\",\n    \"company\": \"Global IT\",\n    \"allocatedInvoices\": []\n  },\n  \"metadata\": {}\n}"
+            },
+            "url": {
+              "raw": "{{collection_app_url}}/integration/erp/webhooks",
+              "host": ["{{collection_app_url}}"],
+              "path": ["integration", "erp", "webhooks"]
+            },
+            "description": "Uses the SAME eventId as 'payment.submitted' above.\nThe Collection App MUST return HTTP 200 without duplicating data.\nThis tests the idempotency requirement from the spec (Section 7)."
+          }
+        }
+      ]
+    }
+  ]
+}

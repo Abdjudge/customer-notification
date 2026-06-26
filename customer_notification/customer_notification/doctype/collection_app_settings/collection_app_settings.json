@@ -1,0 +1,147 @@
+{
+ "actions": [],
+ "creation": "2026-06-26 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "section_connection",
+  "collection_app_webhook_url",
+  "webhook_secret",
+  "column_break_1",
+  "source_system",
+  "erp_company",
+  "section_filters",
+  "send_customer_events",
+  "send_sales_order_events",
+  "send_invoice_events",
+  "column_break_2",
+  "send_payment_events",
+  "send_item_events",
+  "send_pdf_webhook",
+  "section_pull",
+  "invoice_print_format"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable Outbound Webhooks to Collection App"
+  },
+  {
+   "fieldname": "section_connection",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "description": "Full URL of the Collection App webhook endpoint. Example: https://collection.example.com/integration/erp/webhooks",
+   "fieldname": "collection_app_webhook_url",
+   "fieldtype": "Data",
+   "label": "Collection App Webhook URL"
+  },
+  {
+   "description": "Bearer token sent as the Authorization header with every outbound webhook.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret (Bearer Token)"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "ERPNext",
+   "description": "Value sent as sourceSystem in every webhook envelope.",
+   "fieldname": "source_system",
+   "fieldtype": "Data",
+   "label": "Source System Name"
+  },
+  {
+   "description": "Optional label sent as erpCompany in the envelope (e.g. Global IT).",
+   "fieldname": "erp_company",
+   "fieldtype": "Data",
+   "label": "ERP Company Label"
+  },
+  {
+   "fieldname": "section_filters",
+   "fieldtype": "Section Break",
+   "label": "Event Filters"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_customer_events",
+   "fieldtype": "Check",
+   "label": "Send Customer & Contact Events"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_sales_order_events",
+   "fieldtype": "Check",
+   "label": "Send Sales Order Events"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_invoice_events",
+   "fieldtype": "Check",
+   "label": "Send Invoice & Credit Note Events"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_payment_events",
+   "fieldtype": "Check",
+   "label": "Send Payment Events"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_item_events",
+   "fieldtype": "Check",
+   "label": "Send Item / Product Events"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_pdf_webhook",
+   "fieldtype": "Check",
+   "label": "Send invoice.pdf_ready Webhook on Invoice Submit"
+  },
+  {
+   "fieldname": "section_pull",
+   "fieldtype": "Section Break",
+   "label": "Full Pull Settings"
+  },
+  {
+   "description": "Print Format used when building PDF URLs for the pdf_ready webhook and the pull API. Leave blank for the default format.",
+   "fieldname": "invoice_print_format",
+   "fieldtype": "Link",
+   "label": "Invoice PDF Print Format",
+   "options": "Print Format"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-26 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Customer Notification",
+ "name": "Collection App Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
