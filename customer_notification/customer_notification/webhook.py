@@ -183,7 +183,7 @@ def _customer_data(doc):
         "kamName": doc.get("kam_name") or None,
         "salesLead": doc.get("sales_lead") or None,
         "billingEmail": doc.email_id or None,
-        "phone": doc.mobile_no or doc.phone or None,
+        "phone": doc.get("mobile_no") or doc.get("phone") or None,
         "customerGroup": doc.customer_group or None,
         "territory": doc.territory or None,
         "createdAt": str(doc.creation) if doc.creation else None,
